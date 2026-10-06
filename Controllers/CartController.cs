@@ -1,14 +1,16 @@
 using GameStore.Data;
-using GameStore.Infrastructure;
 using GameStore.Models;
 using GameStore.ViewModels;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace GameStore.Controllers;
 
 public class CartController : Controller
 {
     private const string CartSessionKey = "guest-cart";
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IGameCatalogRepository _catalogRepository;
 
@@ -81,7 +83,11 @@ public class CartController : Controller
 
     private ShoppingCart GetCart()
     {
-        var lines = HttpContext.Session.GetObject<List<CartSessionLine>>(CartSessionKey) ?? new List<CartSessionLine>();
+        var json = HttpContext.Session.GetString(CartSessionKey);
+        var lines = string.IsNullOrWhiteSpace(json)
+            ? new List<CartSessionLine>()
+            : JsonSerializer.Deserialize<List<CartSessionLine>>(json, JsonOptions) ?? new List<CartSessionLine>();
+
         var cart = new ShoppingCart();
 
         foreach (var line in lines)
@@ -99,7 +105,7 @@ public class CartController : Controller
     private void SaveCart(ShoppingCart cart)
     {
         var lines = cart.Entries.Select(entry => new CartSessionLine(entry.GameId, entry.Count)).ToList();
-        HttpContext.Session.SetObject(CartSessionKey, lines);
+        HttpContext.Session.SetString(CartSessionKey, JsonSerializer.Serialize(lines, JsonOptions));
     }
 
     private sealed record CartSessionLine(int GameId, int Count);
