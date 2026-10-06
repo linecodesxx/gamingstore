@@ -6,13 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<GameStore.Data.GameStoreDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("GameStore")));
-builder.Services.AddDistributedMemoryCache();
-builder.Services.AddSession(options =>
-{
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-    options.IdleTimeout = TimeSpan.FromHours(2);
-});
 builder.Services.AddScoped<GameStore.Data.IGameCatalogRepository, GameStore.Data.SqliteGameCatalogRepository>();
 
 var app = builder.Build();
@@ -33,7 +26,6 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseSession();
 
 app.UseAuthorization();
 

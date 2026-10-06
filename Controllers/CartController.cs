@@ -2,20 +2,20 @@ using GameStore.Data;
 using GameStore.Models;
 using GameStore.ViewModels;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace GameStore.Controllers;
 
 public class CartController : Controller
 {
-    private const string CartSessionKey = "guest-cart";
+    private const string CartCookieName = "guest-cart-id";
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
+    private readonly GameStoreDbContext _dbContext;
     private readonly IGameCatalogRepository _catalogRepository;
 
-    public CartController(IGameCatalogRepository catalogRepository)
+    public CartController(GameStoreDbContext dbContext, IGameCatalogRepository catalogRepository)
     {
+        _dbContext = dbContext;
         _catalogRepository = catalogRepository;
     }
 
@@ -34,9 +34,26 @@ public class CartController : Controller
             return NotFound();
         }
 
-        var cart = GetCart();
-        cart.AddItem(game, count);
-        SaveCart(cart);
+        var cart = GetOrCreateGuestCart();
+        var entry = _dbContext.GuestCartEntries.FirstOrDefault(item =>
+            item.GuestCartId == cart.GuestCartId && item.GameId == gameId);
+
+        if (entry is null)
+        {
+            _dbContext.GuestCartEntries.Add(new GuestCartEntry
+            {
+                GuestCartId = cart.GuestCartId,
+                GameId = gameId,
+                Count = Math.Max(1, count)
+            });
+        }
+        else
+        {
+            entry.Count += Math.Max(1, count);
+        }
+
+        cart.UpdatedAt = DateTime.UtcNow;
+        _dbContext.SaveChanges();
 
         TempData["CartMessage"] = $"{game.Name} добавлена в корзину.";
 
@@ -52,9 +69,29 @@ public class CartController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult Update(int gameId, int count)
     {
-        var cart = GetCart();
-        cart.SetItemCount(gameId, count);
-        SaveCart(cart);
+        var cartId = GetCartIdFromCookie();
+        if (cartId is null)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var entry = _dbContext.GuestCartEntries.FirstOrDefault(item =>
+            item.GuestCartId == cartId.Value && item.GameId == gameId);
+
+        if (entry is not null)
+        {
+            if (count < 1)
+            {
+                _dbContext.GuestCartEntries.Remove(entry);
+            }
+            else
+            {
+                entry.Count = count;
+            }
+
+            UpdateCartTimestamp(cartId.Value);
+            _dbContext.SaveChanges();
+        }
 
         return RedirectToAction(nameof(Index));
     }
@@ -63,9 +100,21 @@ public class CartController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult Remove(int gameId)
     {
-        var cart = GetCart();
-        cart.DeleteItem(gameId);
-        SaveCart(cart);
+        var cartId = GetCartIdFromCookie();
+        if (cartId is null)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var entry = _dbContext.GuestCartEntries.FirstOrDefault(item =>
+            item.GuestCartId == cartId.Value && item.GameId == gameId);
+
+        if (entry is not null)
+        {
+            _dbContext.GuestCartEntries.Remove(entry);
+            UpdateCartTimestamp(cartId.Value);
+            _dbContext.SaveChanges();
+        }
 
         return RedirectToAction(nameof(Index));
     }
@@ -74,39 +123,89 @@ public class CartController : Controller
     [ValidateAntiForgeryToken]
     public IActionResult Clear()
     {
-        var cart = GetCart();
-        cart.RemoveAll();
-        SaveCart(cart);
+        var cartId = GetCartIdFromCookie();
+        if (cartId is null)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+
+        var entries = _dbContext.GuestCartEntries.Where(item => item.GuestCartId == cartId.Value);
+        _dbContext.GuestCartEntries.RemoveRange(entries);
+        UpdateCartTimestamp(cartId.Value);
+        _dbContext.SaveChanges();
 
         return RedirectToAction(nameof(Index));
     }
 
     private ShoppingCart GetCart()
     {
-        var json = HttpContext.Session.GetString(CartSessionKey);
-        var lines = string.IsNullOrWhiteSpace(json)
-            ? new List<CartSessionLine>()
-            : JsonSerializer.Deserialize<List<CartSessionLine>>(json, JsonOptions) ?? new List<CartSessionLine>();
-
         var cart = new ShoppingCart();
+        var cartId = GetCartIdFromCookie();
 
-        foreach (var line in lines)
+        if (cartId is null)
         {
-            var game = _catalogRepository.GetGame(line.GameId);
-            if (game is not null)
-            {
-                cart.AddItem(game, line.Count);
-            }
+            return cart;
+        }
+
+        var entries = _dbContext.GuestCartEntries
+            .AsNoTracking()
+            .Include(entry => entry.Product)
+            .ThenInclude(game => game.Category)
+            .Where(entry => entry.GuestCartId == cartId.Value)
+            .ToArray();
+
+        foreach (var entry in entries)
+        {
+            cart.AddItem(entry.Product, entry.Count);
         }
 
         return cart;
     }
 
-    private void SaveCart(ShoppingCart cart)
+    private GuestCart GetOrCreateGuestCart()
     {
-        var lines = cart.Entries.Select(entry => new CartSessionLine(entry.GameId, entry.Count)).ToList();
-        HttpContext.Session.SetString(CartSessionKey, JsonSerializer.Serialize(lines, JsonOptions));
+        var cartId = GetCartIdFromCookie();
+        var cart = cartId is null
+            ? null
+            : _dbContext.GuestCarts.FirstOrDefault(item => item.GuestCartId == cartId.Value);
+
+        if (cart is not null)
+        {
+            return cart;
+        }
+
+        cart = new GuestCart
+        {
+            GuestCartId = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _dbContext.GuestCarts.Add(cart);
+        Response.Cookies.Append(CartCookieName, cart.GuestCartId.ToString(), new CookieOptions
+        {
+            HttpOnly = true,
+            IsEssential = true,
+            SameSite = SameSiteMode.Lax,
+            Expires = DateTimeOffset.UtcNow.AddDays(30)
+        });
+
+        return cart;
     }
 
-    private sealed record CartSessionLine(int GameId, int Count);
+    private Guid? GetCartIdFromCookie()
+    {
+        return Request.Cookies.TryGetValue(CartCookieName, out var value) && Guid.TryParse(value, out var cartId)
+            ? cartId
+            : null;
+    }
+
+    private void UpdateCartTimestamp(Guid cartId)
+    {
+        var cart = _dbContext.GuestCarts.FirstOrDefault(item => item.GuestCartId == cartId);
+        if (cart is not null)
+        {
+            cart.UpdatedAt = DateTime.UtcNow;
+        }
+    }
 }

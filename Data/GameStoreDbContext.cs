@@ -16,6 +16,10 @@ public class GameStoreDbContext : DbContext
 
     public DbSet<GamePlatform> GamePlatforms => Set<GamePlatform>();
 
+    public DbSet<GuestCart> GuestCarts => Set<GuestCart>();
+
+    public DbSet<GuestCartEntry> GuestCartEntries => Set<GuestCartEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Category>(entity =>
@@ -69,5 +73,33 @@ public class GameStoreDbContext : DbContext
                     link.ToTable("GamePlatformLink");
                     link.HasKey("GameId", "PlatformId");
                 });
+
+        modelBuilder.Entity<GuestCart>(entity =>
+        {
+            entity.ToTable("GuestCart");
+            entity.HasKey(cart => cart.GuestCartId);
+            entity.Property(cart => cart.CreatedAt).IsRequired();
+            entity.Property(cart => cart.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<GuestCartEntry>(entity =>
+        {
+            entity.ToTable("GuestCartEntry");
+            entity.HasKey(entry => entry.GuestCartEntryId);
+            entity.Property(entry => entry.Count).IsRequired();
+            entity.HasIndex(entry => new { entry.GuestCartId, entry.GameId }).IsUnique();
+
+            entity
+                .HasOne(entry => entry.Cart)
+                .WithMany(cart => cart.Entries)
+                .HasForeignKey(entry => entry.GuestCartId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity
+                .HasOne(entry => entry.Product)
+                .WithMany()
+                .HasForeignKey(entry => entry.GameId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }

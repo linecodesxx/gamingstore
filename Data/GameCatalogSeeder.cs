@@ -8,6 +8,8 @@ public static class GameCatalogSeeder
     public static void Seed(GameStoreDbContext dbContext)
     {
         dbContext.Database.EnsureCreated();
+        EnsureCartTables(dbContext);
+        RemoveBrokenRows(dbContext);
 
         if (dbContext.StoreGames.Any())
         {
@@ -107,6 +109,49 @@ public static class GameCatalogSeeder
 
         dbContext.StoreGames.AddRange(games);
         dbContext.SaveChanges();
+    }
+
+    private static void EnsureCartTables(GameStoreDbContext dbContext)
+    {
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS "GuestCart" (
+                "GuestCartId" TEXT NOT NULL CONSTRAINT "PK_GuestCart" PRIMARY KEY,
+                "CreatedAt" TEXT NOT NULL,
+                "UpdatedAt" TEXT NOT NULL
+            );
+            """);
+
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE TABLE IF NOT EXISTS "GuestCartEntry" (
+                "GuestCartEntryId" INTEGER NOT NULL CONSTRAINT "PK_GuestCartEntry" PRIMARY KEY AUTOINCREMENT,
+                "GuestCartId" TEXT NOT NULL,
+                "GameId" INTEGER NOT NULL,
+                "Count" INTEGER NOT NULL,
+                CONSTRAINT "FK_GuestCartEntry_GuestCart_GuestCartId" FOREIGN KEY ("GuestCartId") REFERENCES "GuestCart" ("GuestCartId") ON DELETE CASCADE,
+                CONSTRAINT "FK_GuestCartEntry_StoreGame_GameId" FOREIGN KEY ("GameId") REFERENCES "StoreGame" ("GameId") ON DELETE CASCADE
+            );
+            """);
+
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_GuestCartEntry_GuestCartId_GameId"
+            ON "GuestCartEntry" ("GuestCartId", "GameId");
+            """);
+
+        dbContext.Database.ExecuteSqlRaw(
+            """
+            CREATE INDEX IF NOT EXISTS "IX_GuestCartEntry_GameId"
+            ON "GuestCartEntry" ("GameId");
+            """);
+    }
+
+    private static void RemoveBrokenRows(GameStoreDbContext dbContext)
+    {
+        dbContext.Database.ExecuteSqlRaw("""DELETE FROM "GuestCartEntry" WHERE "GameId" IN (SELECT "GameId" FROM "StoreGame" WHERE "Name" = '');""");
+        dbContext.Database.ExecuteSqlRaw("""DELETE FROM "StoreGame" WHERE "Name" = '';""");
+        dbContext.Database.ExecuteSqlRaw("""DELETE FROM "Category" WHERE "Title" = '';""");
     }
 
     private static StoreGame CreateGame(
