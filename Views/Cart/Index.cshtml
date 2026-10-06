@@ -1,0 +1,72 @@
+@model GameStore.ViewModels.CartViewModel
+
+@{
+    ViewData["Title"] = "Корзина";
+}
+
+<section class="cart-page">
+    <div class="cart-header">
+        <div>
+            <p class="eyebrow">Guest cart</p>
+            <h1>Корзина</h1>
+            <p>Товары хранятся только для текущей гостевой сессии.</p>
+        </div>
+        <a class="btn btn-outline-secondary" asp-controller="Catalog" asp-action="Index">Продолжить покупки</a>
+    </div>
+
+    @if (Model.Cart.Entries.Count == 0)
+    {
+        <div class="empty-state">
+            <h2>Корзина пустая</h2>
+            <p>Добавьте игры из каталога, чтобы увидеть расчет заказа.</p>
+            <a class="btn btn-primary" asp-controller="Catalog" asp-action="Index">Открыть каталог</a>
+        </div>
+    }
+    else
+    {
+        <div class="cart-layout">
+            <div class="cart-items">
+                @foreach (var entry in Model.Cart.Entries)
+                {
+                    <article class="cart-item">
+                        <img src="@entry.Product.ImageUrl" alt="@entry.Product.Name">
+                        <div class="cart-item__info">
+                            <span>@entry.Product.Category.Title</span>
+                            <h2>@entry.Product.Name</h2>
+                            <p>@entry.Product.Studio</p>
+                        </div>
+                        <form asp-controller="Cart" asp-action="Update" method="post" class="quantity-form">
+                            <input type="hidden" name="gameId" value="@entry.GameId">
+                            <label for="count-@entry.GameId">Количество</label>
+                            <input id="count-@entry.GameId" name="count" type="number" min="0" value="@entry.Count" class="form-control">
+                            <button class="btn btn-outline-secondary" type="submit">Обновить</button>
+                        </form>
+                        <div class="cart-item__price">
+                            <strong>@entry.CalculatePrice().ToString("N0") ₽</strong>
+                            <form asp-controller="Cart" asp-action="Remove" method="post">
+                                <input type="hidden" name="gameId" value="@entry.GameId">
+                                <button class="btn btn-link" type="submit">Удалить</button>
+                            </form>
+                        </div>
+                    </article>
+                }
+            </div>
+
+            <aside class="cart-summary">
+                <h2>Итого</h2>
+                <div class="summary-row">
+                    <span>Позиции</span>
+                    <strong>@Model.TotalCount</strong>
+                </div>
+                <div class="summary-row">
+                    <span>Сумма</span>
+                    <strong>@Model.Cart.GetTotal().ToString("N0") ₽</strong>
+                </div>
+                <button class="btn btn-primary w-100" type="button" disabled>Оформление позже</button>
+                <form asp-controller="Cart" asp-action="Clear" method="post">
+                    <button class="btn btn-outline-danger w-100" type="submit">Очистить корзину</button>
+                </form>
+            </aside>
+        </div>
+    }
+</section>

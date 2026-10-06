@@ -1,0 +1,43 @@
+@model GameStore.Models.StoreGame
+
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<article class="details-page">
+    <div class="details-media">
+        <img src="@Model.ImageUrl" alt="@Model.Name">
+    </div>
+    <div class="details-content">
+        <a class="back-link" asp-controller="Catalog" asp-action="Index">Назад в каталог</a>
+        <p class="eyebrow">@Model.Category.Title</p>
+        <h1>@Model.Name</h1>
+        <p class="details-summary">@Model.Summary</p>
+
+        <dl class="details-list">
+            <div>
+                <dt>Студия</dt>
+                <dd>@Model.Studio</dd>
+            </div>
+            <div>
+                <dt>Дата выхода</dt>
+                <dd>@Model.PublishedAt.ToString("dd.MM.yyyy")</dd>
+            </div>
+            <div>
+                <dt>Платформы</dt>
+                <dd>@string.Join(", ", Model.SupportedPlatforms.Select(platform => platform.Title))</dd>
+            </div>
+        </dl>
+
+        <div class="purchase-panel">
+            <strong>@Model.Cost.ToString("N0") ₽</strong>
+            <form asp-controller="Cart" asp-action="Add" method="post" class="purchase-form">
+                <input type="hidden" name="gameId" value="@Model.GameId">
+                <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString">
+                <label for="count">Количество</label>
+                <input id="count" name="count" type="number" min="1" value="1" class="form-control">
+                <button class="btn btn-primary" type="submit">Добавить в корзину</button>
+            </form>
+        </div>
+    </div>
+</article>

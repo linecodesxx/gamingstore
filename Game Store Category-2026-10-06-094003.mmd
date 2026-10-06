@@ -1,0 +1,37 @@
+---
+config:
+  layout: elk
+  class:
+    hideEmptyMembersBox: false
+  theme: redux-color
+---
+erDiagram
+    CATEGORY {
+        int CategoryId PK
+        string Title
+    }
+
+    STORE_GAME {
+        int GameId PK
+        string Name
+        string Summary
+        decimal Cost
+        datetime PublishedAt
+        string Studio
+        string ImageUrl
+        int CategoryId FK
+    }
+
+    GAME_PLATFORM {
+        int PlatformId PK
+        string Title
+    }
+
+    GAME_PLATFORM_LINK {
+        int GameId PK, FK
+        int PlatformId PK, FK
+    }
+
+    CATEGORY ||--o{ STORE_GAME : groups
+    STORE_GAME ||--o{ GAME_PLATFORM_LINK : uses
+    GAME_PLATFORM ||--o{ GAME_PLATFORM_LINK : includes

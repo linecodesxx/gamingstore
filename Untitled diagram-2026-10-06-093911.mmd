@@ -1,0 +1,53 @@
+---
+config:
+  layout: elk
+  class:
+    hideEmptyMembersBox: false
+---
+classDiagram
+direction TB
+    class StoreGame {
+	    +int GameId
+	    +string Name
+	    +string Summary
+	    +decimal Cost
+	    +DateTime PublishedAt
+	    +string Studio
+	    +string ImageUrl
+	    +int CategoryId
+	    +Category Category
+	    +ICollection~GamePlatform~ SupportedPlatforms
+    }
+
+    class Category {
+	    +int CategoryId
+	    +string Title
+	    +ICollection~StoreGame~ GameList
+    }
+
+    class GamePlatform {
+	    +int PlatformId
+	    +string Title
+	    +ICollection~StoreGame~ AvailableGames
+    }
+
+    class ShoppingCart {
+	    +ICollection~ShoppingCartEntry~ Entries
+	    +decimal GetTotal()
+	    +void AddItem(StoreGame game)
+	    +void DeleteItem(int gameId)
+	    +void RemoveAll()
+    }
+
+    class ShoppingCartEntry {
+	    +int Id
+	    +int GameId
+	    +StoreGame Product
+	    +int Count
+	    +decimal CalculatePrice()
+    }
+
+    Category <-- StoreGame : categorizes
+    StoreGame -- GamePlatform : supports
+    ShoppingCart *-- ShoppingCartEntry : consists of
+    ShoppingCartEntry --> StoreGame : stores

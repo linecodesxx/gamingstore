@@ -1,0 +1,10 @@
+@model int
+
+<a class="nav-cart" asp-controller="Cart" asp-action="Index" aria-label="Открыть корзину">
+    <span class="nav-cart__icon" aria-hidden="true"></span>
+    <span>Корзина</span>
+    @if (Model > 0)
+    {
+        <span class="nav-cart__count">@Model</span>
+    }
+</a>

@@ -1,0 +1,19 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Ошибка";
+}
+
+<section class="info-page error-page">
+    <p class="eyebrow">Ошибка</p>
+    <h1>Не удалось обработать запрос</h1>
+    <p>Попробуйте вернуться в каталог или обновить страницу. Если ошибка повторяется, проверьте маршрут и состояние приложения.</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p class="request-id">
+            <strong>Идентификатор запроса:</strong> <code>@Model.RequestId</code>
+        </p>
+    }
+
+    <a class="btn btn-primary" asp-controller="Catalog" asp-action="Index">В каталог</a>
+</section>

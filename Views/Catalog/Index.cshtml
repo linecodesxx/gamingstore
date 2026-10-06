@@ -1,0 +1,110 @@
+@model GameStore.ViewModels.CatalogIndexViewModel
+
+@{
+    ViewData["Title"] = "Каталог игр";
+}
+
+<section class="catalog-hero">
+    <div class="catalog-hero__content">
+        <p class="eyebrow">Console Game Store</p>
+        <h1>Магазин игр для консолей</h1>
+        <p>Выбирайте игры для PlayStation, Xbox и Nintendo Switch. Каталог открыт без авторизации, а корзина работает как временная гостевая.</p>
+    </div>
+    <div class="catalog-hero__cover">
+        <img src="https://images.unsplash.com/photo-1556438064-2d7646166914?auto=format&fit=crop&w=1100&q=80" alt="Игровые контроллеры на столе">
+    </div>
+</section>
+
+@if (TempData["CartMessage"] is string message)
+{
+    <div class="store-alert" role="status">@message</div>
+}
+
+<section class="catalog-layout" aria-label="Каталог игр">
+    <aside class="filters-panel">
+        <h2>Фильтры</h2>
+        <form asp-controller="Catalog" asp-action="Index" method="get" class="filters-form">
+            <label for="search">Поиск</label>
+            <input id="search" name="search" value="@Model.Search" class="form-control" placeholder="Название или студия">
+
+            <label for="categoryId">Категория</label>
+            <select id="categoryId" name="categoryId" class="form-select">
+                <option value="">Все категории</option>
+                @foreach (var category in Model.Categories)
+                {
+                    <option value="@category.CategoryId" selected="@(Model.SelectedCategoryId == category.CategoryId)">
+                        @category.Title
+                    </option>
+                }
+            </select>
+
+            <label for="platformId">Платформа</label>
+            <select id="platformId" name="platformId" class="form-select">
+                <option value="">Все платформы</option>
+                @foreach (var platform in Model.Platforms)
+                {
+                    <option value="@platform.PlatformId" selected="@(Model.SelectedPlatformId == platform.PlatformId)">
+                        @platform.Title
+                    </option>
+                }
+            </select>
+
+            <button class="btn btn-primary w-100" type="submit">Показать</button>
+            <a class="btn btn-outline-secondary w-100" asp-controller="Catalog" asp-action="Index">Сбросить</a>
+        </form>
+    </aside>
+
+    <div class="catalog-results">
+        <div class="catalog-toolbar">
+            <div>
+                <p class="eyebrow">Найдено</p>
+                <h2>@Model.Games.Count игр</h2>
+            </div>
+        </div>
+
+        @if (Model.Games.Count == 0)
+        {
+            <div class="empty-state">
+                <h3>Ничего не найдено</h3>
+                <p>Попробуйте изменить запрос, категорию или платформу.</p>
+            </div>
+        }
+        else
+        {
+            <div class="game-grid">
+                @foreach (var game in Model.Games)
+                {
+                    <article class="game-card">
+                        <a class="game-card__image" asp-controller="Catalog" asp-action="Details" asp-route-id="@game.GameId">
+                            <img src="@game.ImageUrl" alt="@game.Name">
+                        </a>
+                        <div class="game-card__body">
+                            <div class="game-card__meta">
+                                <span>@game.Category.Title</span>
+                                <span>@game.PublishedAt.Year</span>
+                            </div>
+                            <h3>
+                                <a asp-controller="Catalog" asp-action="Details" asp-route-id="@game.GameId">@game.Name</a>
+                            </h3>
+                            <p>@game.Summary</p>
+                            <div class="platform-list">
+                                @foreach (var platform in game.SupportedPlatforms)
+                                {
+                                    <span>@platform.Title</span>
+                                }
+                            </div>
+                            <div class="game-card__footer">
+                                <strong>@game.Cost.ToString("N0") ₽</strong>
+                                <form asp-controller="Cart" asp-action="Add" method="post">
+                                    <input type="hidden" name="gameId" value="@game.GameId">
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString">
+                                    <button class="btn btn-dark" type="submit">В корзину</button>
+                                </form>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</section>
